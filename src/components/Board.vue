@@ -1,4 +1,5 @@
 <script setup>
+import { matchedRouteKey } from 'vue-router';
 import Cell from './Cell.vue'
 import Steps from './Steps.vue'
 import { ref, onMounted } from 'vue'
@@ -15,8 +16,15 @@ function valsOf(str) {
 const obj = ref({
 //  vals: valsOf("000105000140000670080002400063070010900000003010090520007200080026000035000409000"),
 //    vals: valsOf("070408029002000004854020007008374200020000000003261700000093612200000403130642070"), // nake triple row
-    vals: valsOf("000000000904607000076804100309701080008000300050308702007502610000403208000000000"), // hidden pair
+    // vals: valsOf("000000000904607000076804100309701080008000300050308702007502610000403208000000000"), // hidden pair
+    // vals: valsOf("000001030231090000065003100678924300103050006000136700009360570006019843300000000"), // hidden triple
 //    vals: valsOf('000030086000020040090078520371856294900142375400397618200703859039205467700904132'), // naked quad square
+//    vals: valsOf('901500046425090081860010020502000000019000460600000002196040253200060817000001694'), // hidden quad
+//    vals: valsOf('017903600000080000900000507072010430000402070064370250701000065000030000005601720'), // pointing pairs
+    //vals: valsOf('016007803090800000870001060048000300650009082039000650060900020080002936924600510'), // box/line reduction + y-wing
+    // vals: valsOf('100000569492056108056109240009640801064010000218035604040500016905061402621000005'), //x-wing rows
+//    vals: valsOf('000000094760910050090002081070050010000709000080031067240100070010090045900000100'), //x-wing cols
+    vals: valsOf('100400006046091080005020000000500109090000050402009000000010900080930560500008004'), // simple coloring
   steps: []
 })
 
@@ -97,7 +105,8 @@ function checkSolved() {
 }
 
 function updatePossibilities() {
-    let updated = 0
+    // let updated = 0
+    let updates = new Map()
     for (let r=0 ; r<9 ; r++) {
         for (let c=0 ; c<9 ; c++) {
             let idx = cellIndex(r,c)
@@ -108,7 +117,8 @@ function updatePossibilities() {
                     if (Array.isArray(obj.value.vals[rowIdxs[i]])) {
                         if (obj.value.vals[rowIdxs[i]][ obj.value.vals[idx] - 1] != '') {
                             obj.value.vals[rowIdxs[i]][ obj.value.vals[idx] - 1] = ''
-                            updated++
+                            updates.set(rowIdxs[i],true)
+                            // updated++
                         }
                     }
                 }
@@ -118,7 +128,8 @@ function updatePossibilities() {
                     if (Array.isArray(obj.value.vals[colIdxs[i]])) {
                         if (obj.value.vals[colIdxs[i]][ obj.value.vals[idx] - 1] != '') {
                             obj.value.vals[colIdxs[i]][ obj.value.vals[idx] - 1] = ''
-                            updated++
+                            updates.set(colIdxs[i],true)
+                            // updated++
                         }
                     }
                 }
@@ -128,14 +139,15 @@ function updatePossibilities() {
                     if (Array.isArray(obj.value.vals[sqrIdxs[i]])) {
                         if (obj.value.vals[sqrIdxs[i]][ obj.value.vals[idx] - 1] != '') {
                             obj.value.vals[sqrIdxs[i]][ obj.value.vals[idx] - 1] = ''
-                            updated++
+                            updates.set(sqrIdxs[i],true)
+                            // updated++
                         }
                     }
                 }
             }
         }
     }
-    return { name: "Update Possibilities", updated, updates: [] }
+    return { name: "Update Possibilities", updated: updates.size, updates: [...updates.keys()] }
 }
 
 function cellContainsNote(cell,v) {
@@ -338,16 +350,16 @@ function nakedPairsSqrs() {
             let pairs = []
             for (let s=0 ; s<sqrIdxs.length ; s++) {
                 let cell = obj.value.vals[sqrIdxs[s]]
-                console.log(`${r},${c},${sqrIdxs[s]},${cell}`)
+                // console.log(`${r},${c},${sqrIdxs[s]},${cell}`)
                 let ns = cellContainsTwoNotes(cell)
                 if (ns && ns.length==2) {
                     pairs.push({at:sqrIdxs[s],p:ns})
-                    console.log(`two notes at rc=${r},${c}, notes=${ns}`)
+                    // console.log(`two notes at rc=${r},${c}, notes=${ns}`)
                 }
             }
             let cp = checkPairs(pairs)
             while (cp.length>0) {
-                console.log('sqr pairs',cp);
+                // console.log('sqr pairs',cp);
                 let p = cp.shift()
                 for (let s=0 ; s<sqrIdxs.length ; s++) {
                     if (sqrIdxs[s]==p[0].at || sqrIdxs[s]==p[1].at) continue
@@ -355,7 +367,7 @@ function nakedPairsSqrs() {
                     if (!Array.isArray(cell)) continue
                     for (let x=0 ; x<9 ; x++) {
                         if (cell[x]==p[0].p[0] || cell[x]==p[0].p[1]) {
-                            console.log(cell)
+                            // console.log(cell)
                             cell[x]=''
                             updated++
                             updates.push(sqrIdxs[s])
@@ -381,7 +393,7 @@ function numberIndexes(idxs) {
             }
         }
     }
-    console.log(r)
+    // console.log(r)
     return r;
 }
 function combinations(items, numSubItems) {
@@ -496,6 +508,250 @@ function naked(idxs,minNotes,maxNotes,numCells) {
     return updates;
 }
 
+function hidden(idxs,numCells) {
+
+    let nids = numberIndexes(idxs)
+
+    let filtered = {}
+    for (const [key, value] of Object.entries(nids)) {
+        if (value.length > 0 && value.length <= numCells) {
+            filtered[key] = value
+        }
+    }
+
+    let possibleNumbers = []
+    for (const key of Object.keys(filtered)) {
+        possibleNumbers.push(Number.parseInt(key))
+    }
+
+    let possibleNumberCombinations = combinations(possibleNumbers,numCells)
+
+    for (const combo of possibleNumberCombinations) {
+        let cellIndexes = new Map() 
+        for (const num of combo) {
+            let cellIndexesForNum = filtered[num]
+            for (let cellIndex of cellIndexesForNum) {
+                cellIndexes.set(cellIndex,cellIndex)
+            }
+        }
+        let comboCellIndexes = [...cellIndexes.keys()]
+        if (comboCellIndexes.length == numCells) {
+
+            let updated = false
+            for (let i of comboCellIndexes) {
+                updated = removeNotesExcept(i,combo) || updated
+            }
+            if (updated) return comboCellIndexes
+        }
+    }
+    
+    return [];
+}
+
+function asRows(idxs) {
+    let rows = []
+
+    for (let i=0 ; i<idxs.length ; ) {
+        let row = [idxs[i]];
+        i++
+        while ( i<idxs.length && idxs[i] == row[row.length-1] + 1) {
+            row.push(idxs[i])
+            i++
+        }
+        rows.push(row)
+    }
+    return rows
+}
+
+function asCols(idxs) {
+    let cols = []
+
+    let m = new Map()
+    for (let i of idxs) {
+        m.set(i,i)
+    }
+
+    let inCol = new Map()
+
+    for (let i=0 ; i<idxs.length ; i++) {
+        if (inCol.has(idxs[i])) continue
+        let col = [idxs[i]]
+        inCol.set(idxs[i],true)
+        let next = idxs[i]+9
+        while (m.has(next) && !inCol.has(next)) {
+            col.push(next)
+            inCol.set(next,true)
+            next = next + 9
+        }
+        cols.push(col)
+    }
+
+    return cols
+}
+
+function row(idx) {
+    return Math.floor(idx / 9)
+}
+
+function col(idx) {
+    return idx % 9
+}
+
+function sqr(idx) {
+    let r = row(idx)
+    let c = col(idx)
+    let y = Math.floor(r/3)
+    let x = Math.floor(c/3)
+    let s = y*3 + x
+    // console.log(`r=${r}, c=${c}, s=${s}`)
+    return s
+}
+
+function boxLineReduction(idxs) {
+    // console.log('boxLineReduction',idxs)
+
+    let nids = numberIndexes(idxs)
+
+    let filtered = {}
+    for (const [key,value] of Object.entries(nids)) {
+        if (value.length>1 && value.length<=3) {
+            let v = { sqrs: new Map(), idxs: value }
+            for (let i=0 ; i<value.length ; i++) {
+                let s = sqr(value[i])
+                v.sqrs.set(s,s)
+            }
+            filtered[key] = v
+        }
+    }
+    // console.log(filtered)
+
+    for (const [key,value] of Object.entries(filtered)) {
+        let sqrs = [...value.sqrs.keys()]
+        if (sqrs.length==1) {
+            // console.log(`${key} only appears in sqr ${sqrs[0]}`)
+            let s = sqrs[0]
+            let r = Math.floor(s/3)
+            let c = s - (3*r)
+            // console.log(`s=${s},r=${r*3},c=${c*3}`)
+            let sqrIdxs = sqrIndexes(r*3,c*3)
+            let otherSqrIdxs = sqrIdxs.filter((i) => !idxs.includes(i))
+            let updates = []
+            for (let i of otherSqrIdxs) {
+                if (Array.isArray(obj.value.vals[i])) {
+                    if (obj.value.vals[i][key-1] == `${key}`) {
+                        updates.push(i)
+                        obj.value.vals[i][key-1] = ""
+                    }
+                }
+            }
+            if (updates.length>0) {
+                return updates
+            }
+        }
+    }
+    return []
+}
+
+function pointingPairs(idxs) {
+    // console.log('pointingPairs',idxs)
+
+    let nids = numberIndexes(idxs)
+
+    // console.log(nids)
+    let filtered = {}
+    for (const [key, value] of Object.entries(nids)) {
+        if (value.length > 1 && value.length <= 3) {
+            let rcs = { rows: new Map(), cols: new Map(), coords: []}
+            for (let i=0 ; i<value.length ; i++) {
+                let r = row(value[i])
+                let c = col(value[i])
+                rcs.rows.set(r,r)
+                rcs.cols.set(c,c)
+                rcs.coords.push({ r , c })
+            }
+            // rcs.rows = [ ... rcs.rows.keys()]
+            // rcs.cols = [ ... rcs.cols.keys()]
+            filtered[key] = rcs
+        }
+    }
+    // console.log(filtered)
+
+    for (const [key,value] of Object.entries(filtered)) {
+        if (value.rows.size==1) {
+            let r = value.rows.keys().next().value
+            // console.log(`${key} in row ${r} at cols ${[ ... value.cols.keys()]}`)
+            let ris = rowIndexes(r)
+            ris = ris.filter((v) => !value.cols.has(col(v)))
+            // console.log(ris)
+            let updates = []
+            for (let ir of ris) {
+                if (removeNote(ir,key)) {
+                    // console.log(`removed note ${key} from ${ir}`)
+                    updates.push(ir)
+                }
+            }
+            if (updates.length>0) {
+                return updates
+            }
+        }
+        if (value.cols.size==1) {
+            let c = value.cols.keys().next().value
+            // console.log(`${key} in col ${c} at rows ${[ ... value.rows.keys()]}`)
+            let cis = colIndexes(c)
+            cis = cis.filter((v) => !value.rows.has(row(v)) )
+            // console.log(cis)
+            let updates = []
+            for (let ic of cis) {
+                if (removeNote(ic,key)) {
+                    // console.log(`removed note ${key} from ${ic}`)
+                    updates.push(ic)
+                }
+            }
+            if (updates.length>0) {
+                return updates
+            }
+        }
+    }
+
+    return []
+}
+
+function removeNote(idx,note) {
+    if (!Array.isArray(obj.value.vals[idx])) return false
+    const cell = obj.value.vals[idx]
+    if (cell[note-1] == "") return false
+    cell[note-1] = ""
+    return true
+}
+
+function removeNotesExcept(idx,notes) {
+    // console.log('------------------------')
+    let updated = false
+    let m = new Map();
+    notes.forEach(n => m.set(n,n));
+    let cell = obj.value.vals[idx];
+
+    for (let i=0 ; i<cell.length ; i++) {
+        if (cell[i] != '' && !m.has(cell[i])) {
+            cell[i] = ''
+            updated = true
+        }
+    }
+    // console.log('removeNotesExcept',idx,obj.value.vals[idx],notes,m,updated)
+    return updated
+}
+
+function hiddenPairs(idxs) {
+    return hidden(idxs,2)
+}
+function hiddenTriples(idxs) {
+    return hidden(idxs,3)
+}
+
+function hiddenQuads(idxs) {
+    return hidden(idxs,4)
+}
+
 function nakedTriples(idxs) {
     return naked(idxs,2,3,3)
     // let updates = []
@@ -551,72 +807,487 @@ function nakedQuads(idxs) {
 }
 
 function nakedTriplesRows() {
-    let updates = []
 
     for (let r=0 ; r<9 ; r++) {
         let rowIdxs = rowIndexes(r)
-        updates = updates.concat(nakedTriples(rowIdxs))
+        let updates = nakedTriples(rowIdxs)
+        if (updates.length>0) return { name: "Naked Triples - Rows", updates }
     }
 
-    return { name: "Naked Triples - Rows", updates }
+    return { name: "Naked Triples - Rows", updates: [] }
 }
 
 function nakedTriplesCols() {
-    let updates = []
 
     for (let c=0 ; c<9 ; c++) {
         let colIdxs = colIndexes(c)
-        updates = updates.concat(nakedTriples(colIdxs))
+        let updates = nakedTriples(colIdxs)
+        if (updates.length>0) return { name: "Naked Triples - Columns", updates }
     }
 
-    return { name: "Naked Triples - Columns", updates }
+    return { name: "Naked Triples - Columns", updates: [] }
 }
 
 function nakedTriplesSqrs() {
-    let updates = []
 
     for (let r=0 ; r<9 ; r+=3) {
         for (let c=0 ; c<9 ; c+=3) {
             let sqrIdxs = sqrIndexes(r,c)
-            updates = updates.concat(nakedTriples(sqrIdxs))
+            let updates = nakedTriples(sqrIdxs)
+            if (updates.length>0) return { name: "Naked Triples - Squares", updates }
         }
     }
-    return { name: "Naked Triples - Squares", updates }
+    return { name: "Naked Triples - Squares", updates: [] }
 }
 
 
 function nakedQuadsRows() {
-    let updates = []
 
     for (let r=0 ; r<9 ; r++) {
         let rowIdxs = rowIndexes(r)
-        updates = updates.concat(nakedQuads(rowIdxs))
+        let updates = nakedQuads(rowIdxs)
+        if (updates.length > 0) return { name: "Naked Quads - Rows", updates }
     }
 
-    return { name: "Naked Quads - Rows", updates }
+    return { name: "Naked Quads - Rows", updates: [] }
 }
 
 function nakedQuadsCols() {
-    let updates = []
 
     for (let c=0 ; c<9 ; c++) {
         let colIdxs = colIndexes(c)
-        updates = updates.concat(nakedQuads(colIdxs))
+        let updates = nakedQuads(colIdxs)
+        if (updates.length>0) return { name: "Naked Quads - Columns", updates }
     }
 
-    return { name: "Naked Quads - Columns", updates }
+    return { name: "Naked Quads - Columns", updates: [] }
 }
 
 function nakedQuadsSqrs() {
-    let updates = []
 
     for (let r=0 ; r<9 ; r+=3) {
         for (let c=0 ; c<9 ; c+=3) {
             let sqrIdxs = sqrIndexes(r,c)
-            updates = updates.concat(nakedQuads(sqrIdxs))
+            let updates = nakedQuads(sqrIdxs)
+            if (updates.length > 0) return { name: "Naked Quads - Squares", updates }
         }
     }
-    return { name: "Naked Quads - Squares", updates }
+    return { name: "Naked Quads - Squares", updates: [] }
+}
+
+function hiddenPairsRows() {
+
+    for (let r=0 ; r<9 ; r++) {
+        let rowIdxs = rowIndexes(r)
+        let updates = hiddenPairs(rowIdxs)
+        if (updates.length>0) return { name: "Hidden Pairs - Rows", updates}
+    }
+
+    return { name: "Hidden Pairs - Rows", updates: [] }
+}
+
+function hiddenPairsCols() {
+
+    for (let c=0 ; c<9 ; c++) {
+        let colIdxs = colIndexes(c)
+        let updates = hiddenPairs(colIdxs)
+        if (updates.length > 0) return { name: "Hidden Pairs - Columns", updates }
+    }
+
+    return { name: "Hidden Pairs - Columns", updates: [] }
+}
+
+function hiddenPairsSqrs() {
+
+    for (let r=0 ; r<9 ; r+=3) {
+        for (let c=0 ; c<9 ; c+=3) {
+            let sqrIdxs = sqrIndexes(r,c)
+            let updates = hiddenPairs(sqrIdxs)
+            if (updates.length > 0) return { name: "Hidden Pairs - Squares", updates }
+        }
+    }
+    return { name: "Hidden Pairs - Squares", updates: [] }
+}
+
+function hiddenTriplesRows() {
+
+    for (let r=0 ; r<9 ; r++) {
+        let rowIdxs = rowIndexes(r)
+        let updates = hiddenTriples(rowIdxs)
+        if (updates.length > 0) return { name: "Hidden Triples - Rows", updates }
+    }
+
+    return { name: "Hidden Triples - Rows", updates: [] }
+}
+
+function hiddenTriplesCols() {
+
+    for (let c=0 ; c<9 ; c++) {
+        let colIdxs = colIndexes(c)
+        let updates = hiddenTriples(colIdxs)
+        if (updates.length > 0) return { name: "Hidden Triples - Columns", updates }
+    }
+
+    return { name: "Hidden Triples - Columns", updates: [] }
+}
+
+function hiddenTriplesSqrs() {
+
+    for (let r=0 ; r<9 ; r+=3) {
+        for (let c=0 ; c<9 ; c+=3) {
+            let sqrIdxs = sqrIndexes(r,c)
+            let updates = hiddenTriples(sqrIdxs)
+            if (updates.length > 0) return { name: "Hidden Triples - Squares", updates }
+        }
+    }
+    return { name: "Hidden Triples - Squares", updates: [] }
+}
+
+function hiddenQuadsRows() {
+
+    for (let r=0 ; r<9 ; r++) {
+        let rowIdxs = rowIndexes(r)
+        let updates = hiddenQuads(rowIdxs)
+        if (updates.length > 0) return { name: "Hidden Quads - Rows", updates }
+    }
+
+    return { name: "Hidden Quads - Rows", updates: [] }
+}
+
+function hiddenQuadsCols() {
+
+    for (let c=0 ; c<9 ; c++) {
+        let colIdxs = colIndexes(c)
+        let updates = hiddenQuads(colIdxs)
+        if (updates.length > 0) return { name: "Hidden Quads - Columns", updates }
+    }
+
+    return { name: "Hidden Quads - Columns", updates: [] }
+}
+
+function hiddenQuadsSqrs() {
+
+    for (let r=0 ; r<9 ; r+=3) {
+        for (let c=0 ; c<9 ; c+=3) {
+            let sqrIdxs = sqrIndexes(r,c)
+            let updates = hiddenQuads(sqrIdxs)
+            if (updates.length > 0) return { name: "Hidden Quads - Squares", updates }
+        }
+    }
+    return { name: "Hidden Quads - Squares", updates: [] }
+}
+
+function pointingPairsSqrs() {
+
+    for (let r=0 ; r<9 ; r+=3) {
+        for (let c=0 ; c<9 ; c+=3) {
+            let sqrIdxs = sqrIndexes(r,c)
+            let updates = pointingPairs(sqrIdxs)
+            if (updates.length > 0) return { name: "Pointing Pairs", updates }
+        }   
+    }
+    return { name: "Pointing Pairs", updates: [] }
+}
+
+function appearTwice(idxs) {
+    let nids = numberIndexes(idxs)
+    let filtered = {}
+
+    for (const [key,value] of Object.entries(nids)) {
+        if (value.length == 2) {
+            filtered[key] = value
+        }
+    }
+    return filtered
+}
+
+function xwingRows() {
+    // console.log('xwing rows')
+
+    let notesByRow = new Map();
+
+    //  by row
+    for (let i=0 ; i<9 ; i++) {
+        let nids = numberIndexes(rowIndexes(i))
+        let fids = {}
+        for (const [key,value] of Object.entries(nids)) {
+            if (value.length == 2) {
+                fids[key] = value
+            }
+        }
+        notesByRow.set(i,fids)
+    }
+
+    // console.log(notesByRow)
+
+    for (let n=1 ; n<=9 ; n++) {
+        let rowsWithNoteN = []
+        for (let r=0 ; r<9 ; r++) {
+            let mr = notesByRow.get(r)
+            if (mr[n]) {
+                let notes = []
+                for (let i=0 ; i<mr[n].length ; i++) {
+                    notes.push({ r, idx: mr[n][i], c: col(mr[n][i])     })
+                }
+                rowsWithNoteN.push({ row: r, notes })
+            }
+        }
+
+        let rowPairs = combinations(rowsWithNoteN,2)
+
+//        console.log('row pairs',rowPairs)
+
+        for (let rowPairWithNoteN of rowPairs) {
+
+            // console.log(`rows with note ${n} twice:`,rowPairWithNoteN)
+
+            // check same columsn
+
+            if (rowPairWithNoteN[0].notes[0].c == rowPairWithNoteN[1].notes[0].c 
+                && rowPairWithNoteN[0].notes[1].c == rowPairWithNoteN[1].notes[1].c) {
+                // console.log(`rows with note ${n} twice in same columns`)
+                // remove note from columns
+
+                let removeNote = n
+                let col0 = rowPairWithNoteN[0].notes[0].c
+                let col1 = rowPairWithNoteN[1].notes[1].c
+                let col0Idxs = colIndexes(col0)
+                let col1Idxs = colIndexes(col1)
+                let skipRow0 = rowPairWithNoteN[0].row
+                let skipRow1 = rowPairWithNoteN[1].row
+                // console.log('remove note:',removeNote,'col0',col0,'col1',col1,'skip row0',skipRow0,'skip row1',skipRow1)
+                let removedNotesFrom = []
+
+                for (let r=0 ; r<9 ; r++) {
+                    if (r==skipRow0) continue
+                    if (r==skipRow1) continue
+
+                    let col0Cell = obj.value.vals[col0Idxs[r]]
+                    let col1Cell = obj.value.vals[col1Idxs[r]]
+
+                    // console.log('row',r,'cell0',col0Cell,'cell1',col1Cell)
+
+                    if (Array.isArray(col0Cell)) {
+                        // console.log(col0Cell[removeNote-1],removeNote)
+                        if (col0Cell[removeNote-1] == removeNote) {
+                            // console.log(`remove note ${removeNote} from col:${col0},row:${r}`)
+                            col0Cell[removeNote-1] = ""
+                            removedNotesFrom.push(col0Idxs[r])
+                        }
+                    }
+                    if (Array.isArray(col1Cell)) {
+                        // console.log(col1Cell[removeNote-1],removeNote)
+                        if (col1Cell[removeNote-1] == removeNote) {
+                            // console.log(`remove note ${removeNote} from col:${col1},row:${r}`)
+                            col1Cell[removeNote-1] = ""
+                            removedNotesFrom.push(col1Idxs[r])
+                        }
+                    }
+                }
+
+                // console.log('removedNotesFrom',removedNotesFrom)
+
+                if (removedNotesFrom.length > 0) {
+                    return { name: "X-Wing - Rows", updates: removedNotesFrom }
+                }
+            }
+        }
+    }
+
+    return { name: "X-Wing - Rows", updates: [] }
+}
+
+function xwingCols() {
+    // console.log('xwing cols')
+
+    let notesByCol = new Map();
+
+    //  by col
+    for (let i=0 ; i<9 ; i++) {
+        let nids = numberIndexes(colIndexes(i))
+        let fids = {}
+        for (const [key,value] of Object.entries(nids)) {
+            if (value.length == 2) {
+                fids[key] = value
+            }
+        }
+        notesByCol.set(i,fids)
+    }
+
+//    console.log(notesByCol)
+
+    for (let n=1 ; n<=9 ; n++) {
+        let colsWithNoteN = []
+        for (let c=0 ; c<9 ; c++) {
+            let mc = notesByCol.get(c)
+            if (mc[n]) {
+                let notes = []
+                for (let i=0 ; i<mc[n].length ; i++) {
+                    notes.push({ c, idx: mc[n][i], r: row(mc[n][i])     })
+                }
+                colsWithNoteN.push({ col: c, notes })
+            }
+        }
+
+//        console.log(`note: ${n}`,colsWithNoteN)
+
+        let colPairs = combinations(colsWithNoteN,2)
+
+//        console.log('col pairs',colPairs)
+
+        for (let colPairWithNoteN of colPairs) {
+        // if (colsWithNoteN.length == 2) {
+//            console.log(`cols with note ${n} twice:`,colPairWithNoteN)
+
+            // check same row
+
+            if (colPairWithNoteN[0].notes[0].r == colPairWithNoteN[1].notes[0].r 
+                && colPairWithNoteN[0].notes[1].r == colPairWithNoteN[1].notes[1].r) {
+//                console.log(`cols with note ${n} twice in same rows`)
+                // remove note from rows
+
+                let removeNote = n
+                let row0 = colPairWithNoteN[0].notes[0].r
+                let row1 = colPairWithNoteN[1].notes[1].r
+                let row0Idxs = rowIndexes(row0)
+                let row1Idxs = rowIndexes(row1)
+                let skipCol0 = colPairWithNoteN[0].col
+                let skipCol1 = colPairWithNoteN[1].col
+//                console.log('remove note:',removeNote,'row0',row0,'row1',row1,'skip col0',skipCol0,'skip col1',skipCol1)
+                let removedNotesFrom = []
+
+                for (let c=0 ; c<9 ; c++) {
+                    if (c==skipCol0) continue
+                    if (c==skipCol1) continue
+
+                    let row0Cell = obj.value.vals[row0Idxs[c]]
+                    let row1Cell = obj.value.vals[row1Idxs[c]]
+
+                    // console.log('row',r,'cell0',col0Cell,'cell1',col1Cell)
+
+                    if (Array.isArray(row0Cell)) {
+                        // console.log(col0Cell[removeNote-1],removeNote)
+                        if (row0Cell[removeNote-1] == removeNote) {
+                            // console.log(`remove note ${removeNote} from col:${col0},row:${r}`)
+                            row0Cell[removeNote-1] = ""
+                            removedNotesFrom.push(row0Idxs[c])
+                        }
+                    }
+                    if (Array.isArray(row1Cell)) {
+                        // console.log(col1Cell[removeNote-1],removeNote)
+                        if (row1Cell[removeNote-1] == removeNote) {
+                            // console.log(`remove note ${removeNote} from col:${col1},row:${r}`)
+                            row1Cell[removeNote-1] = ""
+                            removedNotesFrom.push(row1Idxs[c])
+                        }
+                    }
+                }
+
+                // console.log('removedNotesFrom',removedNotesFrom)
+
+                if (removedNotesFrom.length > 0) {
+                    return { name: "X-Wing - Cols", updates: removedNotesFrom }
+                }
+            }
+        }
+    }
+
+    return { name: "X-Wing - Cols", updates: [] }
+}
+
+function boxLineReductionRows() {
+
+    for (let r=0 ; r<9 ; r++) {
+        let rowIdxs = rowIndexes(r)
+        let updates = boxLineReduction(rowIdxs)
+        if (updates.length > 0) return { name: "Box/Line Reduction - Rows", updates }
+    }
+
+    return { name: "Box/Line Reduction - Rows", updates: [] }
+}
+
+function boxLineReductionCols() {
+
+    for (let c=0 ; c<9 ; c++) {
+        let colIdxs = colIndexes(c)
+        let updates = boxLineReduction(colIdxs)
+        if (updates.length > 0) return { name: "Box/Line Reduction - Columns", updates }
+    }
+
+    return { name: "Box/Line Reduction - Columns", updates: [] }
+}
+
+function chaining() {
+
+    let nodes = []
+
+    //  by col
+    for (let i=0 ; i<9 ; i++) {
+        let nids = numberIndexes(colIndexes(i))
+        let fids = {}
+        for (const [key,value] of Object.entries(nids)) {
+            if (value.length == 2) {
+                fids[key] = value.map(v => {return { type: "COL", col: i, idx: v, note: Number.parseInt(key), row: row(v) }})
+                fids[key][0].pair = fids[key][1].idx
+                fids[key][1].pair = fids[key][0].idx
+                nodes.push(fids[key][0])
+                nodes.push(fids[key][1])
+            }
+        }
+    }
+
+    //  by row
+    for (let i=0 ; i<9 ; i++) {
+        let nids = numberIndexes(rowIndexes(i))
+        let fids = {}
+        for (const [key,value] of Object.entries(nids)) {
+            if (value.length == 2) {
+                fids[key] = value.map(v => {return { type: "ROW", col: col(v), idx: v, note: Number.parseInt(key), row: i }})
+                fids[key][0].pair = fids[key][1].idx
+                fids[key][1].pair = fids[key][0].idx
+                nodes.push(fids[key][0])
+                nodes.push(fids[key][1])
+            }
+        }
+    }
+
+    //  by square
+    for (let r=0 ; r<9 ; r+=3) {
+        for (let c=0 ; c<9 ; c+=3) {
+            let nids = numberIndexes(sqrIndexes(r,c))
+            let s = r/3*3 + c/3
+            let fids = {}
+            for (const [key,value] of Object.entries(nids)) {
+                if (value.length == 2) {
+                    fids[key] = value.map(v => {return { type: "SQR", sqr: s, col: col(v), idx: v, note: Number.parseInt(key), row: row(v) }})
+                    fids[key][0].pair = fids[key][1].idx
+                    fids[key][1].pair = fids[key][0].idx
+                    nodes.push(fids[key][0])
+                    nodes.push(fids[key][1])
+                }
+            }
+        }
+    }
+
+    for (let n=1 ; n<=9 ; n++) {
+        let ncols = []
+        let nrows = []
+        let nsqrs = []
+        let found = false
+        for (let i=0 ; i<nodes.length ; i++) {
+            if (nodes[i].note == n) {
+                found = true
+                if (nodes[i].type=="COL") ncols.push(nodes[i])
+                else if (nodes[i].type=="ROW") nrows.push(nodes[i])
+                else if (nodes[i].type=="SQR") nsqrs.push(nodes[i])
+            }
+        }
+        if (found) {
+            console.log(ncols,nrows,nsqrs)
+        }
+    }
+
+    return { name: "Simple Colouring/Chaining", updates: [] }
 }
 
 
@@ -634,22 +1305,24 @@ const steps = [
     // naked triples
     nakedTriplesRows, nakedTriplesCols, nakedTriplesSqrs,
     // hidden pairs
-    
+    hiddenPairsRows, hiddenPairsCols, hiddenPairsSqrs,
     // hidden triples
-
+    hiddenTriplesRows, hiddenTriplesCols, hiddenTriplesSqrs,
     // naked quads
-    nakedQuadsRows, nakedQuadsCols, nakedQuadsSqrs
-
+    nakedQuadsRows, nakedQuadsCols, nakedQuadsSqrs,
     // hidden quads
-
+    hiddenQuadsRows, hiddenQuadsCols, hiddenQuadsSqrs,
     // pointing pairs
-
+    pointingPairsSqrs,
     // box/line reduction
+    boxLineReductionRows, boxLineReductionCols,
+
+    // TOUGH ------
 
     // x-wing
-
+    xwingRows, xwingCols,
     // simple coloring
-
+    chaining
     // y-wing
 
     // sword fish
@@ -667,8 +1340,9 @@ const steps = [
 ]
 
 function nextStep() {
-    if (completed.value) return
-    let res = steps[step % steps.length]()
+    if (completed.value) return false
+    if (step >= steps.length) return false
+    let res = steps[step]()
     obj.value.steps.push(res)
     if (res.updates.length>0) {
         step = 0
@@ -677,6 +1351,14 @@ function nextStep() {
         step++
     }
     console.log(step)
+    return true
+}
+
+function solve() {
+    while (nextStep()) {
+
+    }
+    console.log(completed.value ? "SOLVED" : "NOT SOLVED")
 }
 
 </script>
@@ -701,6 +1383,7 @@ function nextStep() {
   </table>
   <div class="steps">
     <button :class="{ completed: completed }" @click="nextStep">Next Step</button>
+    <button :class="{ completed: completed }" @click="solve">Solve</button>
     <Steps v-bind:steps="obj.steps" />
   </div>
 </template>
